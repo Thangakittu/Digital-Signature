@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accessible Digital Signature</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+            color: #000; /* Text contrast for high visibility */
+        }
+        .tab-panel {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            margin-right: 10px;
+            background-color: #fff;
+            border: 2px solid #007bff;
+            color: #007bff;
+            cursor: pointer;
+            outline: none;
+            font-size: 16px;
+        }
+        .tab.active {
+            background-color: #007bff;
+            color: white;
+            border-bottom: none;
+        }
+        .tab:focus {
+            outline: 3px solid black;
+        }
+        .tab-content {
+            display: none;
+            border: 2px solid #007bff;
+            padding: 20px;
+            background-color: #fff;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        canvas {
+            border: 2px solid #000;
+        }
+        .name-input {
+            font-size: 18px;
+            padding: 10px;
+            border: 2px solid #007bff;
+            outline: none;
+            width: 7cm; /* Limit input width to 7 cm */
+        }
+        .name-input:focus {
+            outline: 3px solid black;
+        }
+        #signature-preview {
+            max-width: 100%;
+            height: auto;
+        }
+        .submit-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            outline: none;
+        }
+        .submit-btn:focus {
+            outline: 3px solid black;
+        }
+        input[type="file"]:focus, button:focus, input[type="text"]:focus {
+            outline: 3px solid black;
+        }
+        .error-message {
+            color: red;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .error-message[aria-live="assertive"] {
+            outline: 3px solid red;
+            padding: 5px;
+        }
+        label {
+            font-size: 18px;
+            color: #000; /* High contrast label text */
+        }
+    </style>
+</head>
+<body>
+
+<h1>Accessible Digital Signature</h1>
+
+<!-- Tab panel with aria attributes -->
+<div class="tab-panel" role="tablist">
+    <div class="tab active" role="tab" tabindex="0" aria-selected="true" aria-controls="draw-tab" id="tab-1">Draw Signature</div>
+    <div class="tab" role="tab" tabindex="-1" aria-selected="false" aria-controls="upload-tab" id="tab-2">Upload Signature</div>
+    <div class="tab" role="tab" tabindex="-1" aria-selected="false" aria-controls="type-tab" id="tab-3">Type Name</div>
+</div>
+
+<!-- Drawing tab panel -->
+<div id="draw-tab" class="tab-content active" role="tabpanel" aria-labelledby="tab-1">
+    <h3>Draw Your Signature</h3>
+    <canvas id="signatureCanvas" width="400" height="150" aria-label="Signature canvas, use the mouse to draw"></canvas><br>
+    <button id="clearCanvas">Clear</button>
+</div>
+
+<!-- Upload tab panel -->
+<div id="upload-tab" class="tab-content" role="tabpanel" aria-labelledby="tab-2">
+    <h3>Upload Your Signature</h3>
+    <label for="signatureUpload">Upload a file (image):</label>
+    <input type="file" id="signatureUpload" accept="image/*"><br>
+    <img id="signature-preview" alt="Your Signature Preview" />
+</div>
+
+<!-- Type name tab panel -->
+<div id="type-tab" class="tab-content" role="tabpanel" aria-labelledby="tab-3">
+    <h3>Type Your Name</h3>
+    <label for="typedName">Enter your name:</label>
+    <input type="text" id="typedName" class="name-input" placeholder="Enter your name"><br>
+    <div id="name-preview" style="margin-top: 20px; font-size: 24px; font-style: italic; color: #007bff;"></div>
+</div>
+
+<!-- Submit button and error message area -->
+<button class="submit-btn" id="submitSignature">Submit Signature</button>
+<div id="error-message" class="error-message" role="alert" aria-live="assertive" style="display: none;"></div>
+
+<script>
+    // Keyboard accessible tab navigation
+    const tabs = document.querySelectorAll('.tab');
+    const tabContents = document.querySelectorAll('.tab-content');
+    const errorMessage = document.getElementById('error-message');
+
+    // Initialize tab focus and active state
+    tabs.forEach((tab, index) => {
+        tab.addEventListener('click', () => activateTab(index));
+        tab.addEventListener('keydown', (e) => handleTabKeydown(e, index));
+    });
+
+    function activateTab(index) {
+        // Deactivate all tabs and panels
+        tabs.forEach((tab, i) => {
+            tab.classList.remove('active');
+            tab.setAttribute('aria-selected', 'false');
+            tab.setAttribute('tabindex', '-1');
+            tabContents[i].classList.remove('active');
+        });
+
+        // Activate the selected tab and panel
+        tabs[index].classList.add('active');
+        tabs[index].setAttribute('aria-selected', 'true');
+        tabs[index].setAttribute('tabindex', '0');
+        tabContents[index].classList.add('active');
+        tabs[index].focus();  // Set focus on the active tab
+        errorMessage.style.display = 'none'; // Hide error message on tab change
+    }
+
+    function handleTabKeydown(event, index) {
+        const key = event.key;
+
+        if (key === 'ArrowRight' || key === 'ArrowLeft') {
+            const newIndex = key === 'ArrowRight' ? (index + 1) % tabs.length : (index - 1 + tabs.length) % tabs.length;
+            activateTab(newIndex);
+        } else if (key === 'Enter' || key === ' ') {
+            activateTab(index);
+        } else if (key === 'Tab') {
+            // Prevent focus from being trapped in the tab panel
+            const activeContent = tabContents[index];
+            const focusableElements = activeContent.querySelectorAll('input, button, canvas');
+            const firstFocusable = focusableElements[0];
+            const lastFocusable = focusableElements[focusableElements.length - 1];
+
+            if (event.shiftKey) { // Shift + Tab
+                if (document.activeElement === firstFocusable) {
+                    event.preventDefault();
+                    tabs[index].focus(); // Return focus to the tab
+                }
+            } else { // Tab
+                if (document.activeElement === lastFocusable) {
+                    event.preventDefault();
+                    const nextTab = tabs[(index + 1) % tabs.length];
+                    nextTab.focus(); // Move focus to the next tab
+                }
+            }
+        }
+    }
+
+    // Drawing signature on canvas
+    const canvas = document.getElementById('signatureCanvas');
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+
+    canvas.addEventListener('mousedown', (e) => {
+        drawing = true;
+        ctx.beginPath();
+        ctx.moveTo(e.offsetX, e.offsetY);
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (drawing) {
+            ctx.lineTo(e.offsetX, e.offsetY);
+            ctx.stroke();
+        }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+        drawing = false;
+    });
+
+    document.getElementById('clearCanvas').addEventListener('click', () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    });
+
+    // Handling file upload for signature
+    const signatureUpload = document.getElementById('signatureUpload');
+    const signaturePreview = document.getElementById('signature-preview');
+
+    signatureUpload.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                signaturePreview.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // Handling typed name as signature
+    const typedName = document.getElementById('typedName');
+    const namePreview = document.getElementById('name-preview');
+
+    typedName.addEventListener('input', () => {
+        namePreview.textContent = typedName.value;
+    });
+
+    // Handle submit button click with validation
+    document.getElementById('submitSignature').addEventListener('click', () => {
+        const drawnSignature = !isCanvasBlank(canvas);
+        const uploadedSignature = signatureUpload.files.length > 0;
+        const typedSignature = typedName.value.trim() !== '';
+
+        // Check if at least one option is filled
+        if (!drawnSignature && !uploadedSignature && !typedSignature) {
+            showError('Please provide at least one signature option (draw, upload, or type your name).');
+            return;
+        }
+
+        let signatureData = '';
+
+        if (drawnSignature) {
+            signatureData = canvas.toDataURL();
+            console.log('Drawn Signature Data URL:', signatureData);
+        } else if (uploadedSignature) {
+            signatureData = signaturePreview.src;
+            console.log('Uploaded Signature Data URL:', signatureData);
+        } else if (typedSignature) {
+            signatureData = typedName.value;
+            console.log('Typed Signature:', signatureData);
+        }
+
+        errorMessage.style.display = 'none';  // Hide any previous error messages
+        alert('Signature submitted successfully!');
+        // Here you can send the signatureData to your server via an AJAX call or form submission
+    });
+
+    // Helper function to check if canvas is blank
+    function isCanvasBlank(canvas) {
+        const blank = document.createElement('canvas');
+        blank.width = canvas.width;
+        blank.height = canvas.height;
+        return canvas.toDataURL() === blank.toDataURL();
+    }
+
+    // Helper function to display error message with screen reader support
+    function showError(message) {
+        errorMessage.textContent = message;
+        errorMessage.style.display = 'block';
+    }
+</script>
+
+</body>
+</html>
